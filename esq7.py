@@ -139,6 +139,45 @@ def getSign(x):
         return abs(x) / x
     except:
         return 0
+
+class recta:
+    def __init__(self,x1,y1,x2,y2):
+        self.vert = False
+        self.inicio = [x1,y1]
+        self.fin = [x2,y2]
+        if x1 < x2:
+            self.dir = 1
+        elif x2 < x1:
+            self.dir = -1
+        elif y1 < y2:
+            self.dir = 1
+        else:
+            self.dir = -1
+        try:
+            self.m = (y2 - y1) / (x2 - x1)
+            self.b = y1 - self.m * x1
+        except:
+            self.m = 0
+            self.b = x2
+            self.vert = True
+    def calcPoint(self,x1,y1,d):
+        if not self.vert:
+            newX = x1 + self.dir * (d * np.cos(np.arctan(self.m)))
+            newY = self.m * newX + self.b
+        else:
+            newX = self.b
+            newY = y1 + d
+        return newX, newY
+    def calcDist(self,x,y):
+        if self.vert:
+            return abs(self.m * y - x + self.b)/np.sqrt(self.m**2+(-1)**2)
+        else:
+            return abs(self.m * x - y + self.b)/np.sqrt(self.m**2+(-1)**2)
+
+    def calcDistGoal(self,x,y):
+        return np.sqrt((y - self.fin[1])**2 + (x - self.fin[0])**2)
+      
+        
 def go_to_goal (xgoal, ygoal):
     global x
     global y
@@ -153,7 +192,45 @@ def go_to_goal (xgoal, ygoal):
     coordenadasPaso2 = [0,0]
     coordenadasPaso3 = [0,0]
     linear_speed = 0
+    objTemp = []
 
+    carriles = []
+    carriles.append(recta(x,y,xgoal,ygoal))
+    if carriles[0].vert:
+        newRecta = [0,y,False]
+        newRecta2 = [0,ygoal,False]
+    elif carriles[0].m == 0:
+        newRecta = [0,x,True]
+        newRecta2 = [0,xgoal,True]
+    else:
+        newM = -1/carriles[0].m
+        newRecta = [newM,y-newM*x,False]
+        newRecta2 = [newM,ygoal-newM*xgoal,False]
+    distanciaCarriles = radioTortuga * 2
+    if not newRecta[2]:
+        xT = x + np.cos(np.arctan(newRecta[0])) * distanciaCarriles
+        yT = newRecta[0] * xT + newRecta[1]
+        xT2 = xgoal + np.cos(np.arctan(newRecta2[0])) * distanciaCarriles
+        yT2 = newRecta2[0] * xT2 + newRecta2[1]
+    else:
+        xT = x
+        yT = y + distanciaCarriles
+        xT2 = xgoal
+        yT2 =  ygoal + distanciaCarriles
+    carriles.append(recta(xT,yT,xT2,yT2))
+    if not newRecta[2]:
+        xT = x - np.cos(np.arctan(newRecta[0])) * distanciaCarriles
+        yT = newRecta[0] * xT + newRecta[1]
+        xT2 = xgoal - np.cos(np.arctan(newRecta2[0])) * distanciaCarriles
+        yT2 = newRecta2[0] * xT2 + newRecta2[1]
+    else:
+        xT = x
+        yT = y - distanciaCarriles
+        xT2 = xgoal
+        yT2 =  ygoal - distanciaCarriles
+    carriles.append(recta(xT,yT,xT2,yT2))
+    carrilAct = 0
+    distGoalT = 0.5
     borderLimit = 0.5
     if xgoal < borderLimit:
         xgoal = borderLimit
@@ -167,18 +244,25 @@ def go_to_goal (xgoal, ygoal):
     while(True):
         
         iter +=1
+        dGoalFinal = abs(math.sqrt(((goal[0]-x)**2)+((goal[1]-y)**2)))
+        if dGoalFinal < distGoalT:
+            xgoal = goal[0]
+            ygoal = goal[1]
+        else:
+            xgoal,ygoal = carriles[carrilAct].calcPoint(x,y,distGoalT)
+        orientate(xgoal,ygoal)
         ka = 4.0
         desired_angle_goal = math.atan2(ygoal-y, xgoal-x)
         
-        print("Data",[xgoal,ygoal],[x,y])
-        print("Original",theta,desired_angle_goal)
+        #print("Data",[xgoal,ygoal],[x,y])
+        #print("Original",theta,desired_angle_goal)
         if getSign(theta) != getSign(desired_angle_goal):
             if abs(abs(theta)-abs(desired_angle_goal)) > np.pi:
                 if getSign(theta) < 0:
                     theta = np.pi*2 + theta
                 else:
                     desired_angle_goal = np.pi*2 + desired_angle_goal
-                print("mod",theta,desired_angle_goal)
+                #print("mod",theta,desired_angle_goal)
         dtheta = desired_angle_goal-theta
         
         #dtheta = desired_angle_goal-theta
@@ -188,12 +272,12 @@ def go_to_goal (xgoal, ygoal):
             else:
                 dtheta = (abs(dtheta) - np.pi)  
                 
-            print('dtheta new',dtheta)
+            #print('dtheta new',dtheta)
         angular_speed = ka * (dtheta)
         if(abs(dtheta) > 0.5):
-            kv = 0.1
+            kv = 1.5
         else:
-            kv = 0.5
+            kv = 3
         if seguida:
             kv = kv * 2
         if esquivando:
@@ -255,72 +339,30 @@ def go_to_goal (xgoal, ygoal):
                         goalUpdate = True
                 
                 else:
-                    ##print("newTortuga")
-                    ##print("yo",[x,y,theta])
-                    ##print("ella",[tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y,tortugas[indexCercanas[i]].theta])
-                    ##print("mirecta",miRecta)
-                    ##print("surecta",rectas)
-                    ##print("mioposite",oppositeAngle(theta))
-                    ##print("Cerca de mi y estancada")
-                    if miRecta[2]:
-                        yOtrarecta = tortugas[indexCercanas[i]].y
-                    else:
-                        yOtrarecta = miRecta[0] * tortugas[indexCercanas[i]].x + miRecta[1]
-                    
-                    #print('esuivar test',yOtrarecta,tortugas[indexCercanas[i]].y,abs(tortugas[indexCercanas[i]].y - yOtrarecta))
-                    if abs(tortugas[indexCercanas[i]].y - yOtrarecta) < radioTortuga and anguloTemp + np.pi/2 > 0:
-                        #print(esquivando)
-                        if not esquivando:
-                            esquivando = True
-                            if miRecta[2]:
-                                newRecta = [0,y,False]
-                            elif miRecta[0] == 0:
-                                newRecta = [0,x,True]
-                            else:
-                                newM = -1/miRecta[0]
-                                newRecta = [newM,y-newM*x,False]
-                            if not newRecta[2]:
-                                xgoal = x + radioTortuga * 4/2 * np.cos(np.arctan(newRecta[0])) 
-                                ygoal = newRecta[0] * xgoal + newRecta[1]
-                            
-                                if xgoal > 10.5 or ygoal > 10.5 or ygoal < 0.5:
-                                    #time.sleep(1.0)
-                                    #print(newRecta)
-                                    xgoal = x - radioTortuga * 4/2 * np.cos(np.arctan(newRecta[0]))
-                                    ygoal = newRecta[0] * xgoal + newRecta[1]
-                                if xgoal > 10.5 or xgoal < 0.5 or ygoal > 10.5 or ygoal < 0.5:
-                                    xgoal = abs(xgoal)
-                                    ygoal = abs(ygoal)
-                                #print('actual',x,y,'new',xgoal,ygoal)
-                                if distance > 2.5* radioTortuga:
-                                    if miRecta[2]:
-                                        xOtroPunto = x
-                                        yOtroPunto = y + 2.5*radioTortuga + (tortugas[indexCercanas[i]].y-y)
-                                    else:
-                                        xOtroPunto = x + 2.5*radioTortuga * np.cos(theta) + (tortugas[indexCercanas[i]].x-x)
-                                        yOtroPunto = miRecta[0] * xOtroPunto + miRecta[1]
-                                    coordenadasPaso3 = [xOtroPunto,yOtroPunto]
-                                    '''
-                                    paralela = [miRecta[0],ygoal - miRecta[0] * xgoal,miRecta[2]]
-                                    if paralela[2]:
-                                        xOtroPunto2 = xOtroPunto
-                                        yOtroPunto2 = y + 2.5*radioTortuga + (tortugas[indexCercanas[i]].y-y)
-                                    else:
-                                        xOtroPunto2 = xgoal + 2.5*radioTortuga * np.cos(theta) + (tortugas[indexCercanas[i]].x-x)
-                                        yOtroPunto2 = paralela[0] * xOtroPunto2 + paralela[1]
-                                    coordenadasPaso2 = [xOtroPunto2,yOtroPunto2]
-                                    '''
-                                    pasoEsquivo = 3
-                                else:
-                                    pasoEsquivo = 3
-                            else:
-                                #print('lol?')
-                                xgoal = radioTortuga * 4/2 * np.cos(np.arctan(newRecta[0])) + x
-                                ygoal = y
+                    distanciaMiCarril = carriles[carrilAct].calcDist(tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y)
+                    distGoalYo = carriles[carrilAct].calcDistGoal(x,y)
+                    distGoalOtra = carriles[carrilAct].calcDistGoal(tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y)
+                    if distanciaMiCarril < radioTortuga and distGoalYo > distGoalOtra:
+                        idxCercano = 0
+                        menor = radioTortuga * 3
+                        for carr in range(3):
+                            if carr != carrilAct:
+                                distanciaOtroCarril = carriles[carr].calcDist(tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y)
+                                if distanciaOtroCarril > radioTortuga and distanciaOtroCarril < menor:
+                                    idxCercano = carr
+                                    menor = distanciaOtroCarril
+                        print("Lane change:",distanciaMiCarril,"act",carrilAct,"new",idxCercano,"yo",[x,y,distGoalYo],"ella",[tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y,distGoalOtra])
+                        carrilAct = idxCercano
+                    elif carrilAct != 0:
+                        distanciaCentral = carriles[0].calcDist(tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y)
+                        distGoalYo = carriles[0].calcDistGoal(x,y)
+                        distGoalOtra = carriles[0].calcDistGoal(tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y)
+                        if distGoalOtra - distGoalYo > radioTortuga/2 and distanciaCentral < radioTortuga:
+                            carrilAct = 0
+                            print("Regreso",distGoalOtra,distGoalYo,distGoalOtra - distGoalYo)
+                    print("lol")
 
-                                if xgoal > 10.5 or xgoal < 0.5 or ygoal > 10.5 or ygoal < 0.5:
-                                    xgoal = x - radioTortuga * 4/2 * np.cos(np.arctan(newRecta[0]))
-                                    ygoal = y
+                    
                     
                    
             elif not esquivando and linear_speed > 0.05:
