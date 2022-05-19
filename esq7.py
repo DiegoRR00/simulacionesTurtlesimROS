@@ -1,11 +1,15 @@
 #! /usr/bin/env python
 
 from cmath import rect
+from distutils import ccompiler
+from gettext import find
 from glob import glob
 from operator import xor
 import re
 from tempfile import tempdir
 from turtle import st
+
+from pkg_resources import DEVELOP_DIST
 import rospy
 from geometry_msgs.msg import Twist
 from turtlesim.msg import Pose
@@ -61,8 +65,8 @@ theta = 0
 xAnt = 0
 yAnt = 0
 
-radioTortuga = 1
-radioCerca = 2
+radioTortuga = 1.0
+radioCerca = 2.0
 
 seguida = False
 circulo = False
@@ -245,6 +249,44 @@ def go_to_goal (xgoal, ygoal):
         
         iter +=1
         dGoalFinal = abs(math.sqrt(((goal[0]-x)**2)+((goal[1]-y)**2)))
+
+        if carrilAct != 0:
+                        #Sacar donde etaria en el otro carril y evaluar ahi
+            if carriles[carrilAct].vert:
+                newRecta = [0,y,False]
+                
+            elif carriles[carrilAct].m == 0:
+                newRecta = [0,x,True]
+                
+            else:
+                newM = -1/carriles[0].m
+                newRecta = [newM,y-newM*x,False]
+                
+            if not newRecta[2]:
+                if carrilAct == 2:
+                    xT = x + np.cos(np.arctan(newRecta[0])) * distanciaCarriles
+                    yT = newRecta[0] * xT + newRecta[1]
+                else:
+                    xT = x - np.cos(np.arctan(newRecta[0])) * distanciaCarriles
+                    yT = newRecta[0] * xT + newRecta[1]
+            else:
+                xT = x
+                if carrilAct == 2:
+                    yT = y + distanciaCarriles
+                else:
+                    yT = y - distanciaCarriles
+            dEnRecta0 = carriles[0].calcDistGoal(xT,yT)
+            cambio = True
+            for tt in range(len(tortugas)):
+                distRectaOtra = carriles[0].calcDist(tortugas[tt].x,tortugas[tt].y)
+                distGoalOtra = carriles[0].calcDistGoal(tortugas[tt].x,tortugas[tt].y)
+                if distRectaOtra < radioTortuga:
+                    if distGoalOtra - dEnRecta0 < radioTortuga:
+                        cambio = False
+                else:
+                    print("Regreso",[x,y],[xT,yT],dEnRecta0,distGoalOtra)
+            if cambio:
+                carrilAct = 0
         if dGoalFinal < distGoalT:
             xgoal = goal[0]
             ygoal = goal[1]
@@ -344,6 +386,7 @@ def go_to_goal (xgoal, ygoal):
                     distGoalOtra = carriles[carrilAct].calcDistGoal(tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y)
                     if distanciaMiCarril < radioTortuga and distGoalYo > distGoalOtra:
                         idxCercano = 0
+                        '''
                         menor = radioTortuga * 3
                         for carr in range(3):
                             if carr != carrilAct:
@@ -351,15 +394,23 @@ def go_to_goal (xgoal, ygoal):
                                 if distanciaOtroCarril > radioTortuga and distanciaOtroCarril < menor:
                                     idxCercano = carr
                                     menor = distanciaOtroCarril
-                        print("Lane change:",distanciaMiCarril,"act",carrilAct,"new",idxCercano,"yo",[x,y,distGoalYo],"ella",[tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y,distGoalOtra])
+                        '''
+                        turtlesInLane = [0,0,0]
+                        turtlesInLane[carrilAct] += 1
+                        for torta in range(len(tortugas)):
+                            if torta != indexCercanas[i]:
+                                distanciaACarril = []
+                                distanciaACarril.append(carriles[0].calcDist(tortugas[torta].x,tortugas[torta].y))
+                                distanciaACarril.append(carriles[1].calcDist(tortugas[torta].x,tortugas[torta].y))
+                                distanciaACarril.append(carriles[2].calcDist(tortugas[torta].x,tortugas[torta].y))
+                                for laneio in range(3):
+                                    if distanciaACarril[laneio] < radioTortuga:
+                                        turtlesInLane[laneio] += 1
+                        idxCercano = turtlesInLane.index(min(turtlesInLane))
+                        print("Lane change:",distanciaMiCarril,"act",carrilAct,"new",idxCercano,"yo",[x,y,distGoalYo],"ella",[tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y,distGoalOtra],"cercanos",turtlesInLane)
                         carrilAct = idxCercano
-                    elif carrilAct != 0:
-                        distanciaCentral = carriles[0].calcDist(tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y)
-                        distGoalYo = carriles[0].calcDistGoal(x,y)
-                        distGoalOtra = carriles[0].calcDistGoal(tortugas[indexCercanas[i]].x,tortugas[indexCercanas[i]].y)
-                        if distGoalOtra - distGoalYo > radioTortuga/2 and distanciaCentral < radioTortuga:
-                            carrilAct = 0
-                            print("Regreso",distGoalOtra,distGoalYo,distGoalOtra - distGoalYo)
+                    
+                        
                     print("lol")
 
                     
